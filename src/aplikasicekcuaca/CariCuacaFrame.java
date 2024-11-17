@@ -7,19 +7,19 @@ package aplikasicekcuaca;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.table.DefaultTableModel;
 import org.json.JSONObject;
-import org.json.JSONArray;
+
+import javax.swing.JComboBox;
 
 
 /**
@@ -28,12 +28,71 @@ import org.json.JSONArray;
  */
 public class CariCuacaFrame extends javax.swing.JFrame {
 
+    private DefaultTableModel tableModel;
+
     /**
      * Creates new form CariCuacaFrame
      */
+
     public CariCuacaFrame() {
         initComponents();
+        setupTableModel();
+        loadFavorit();
+        loadRiwayat();
     }
+    
+    private void setupTableModel() {
+        tableModel = new DefaultTableModel(new String[]{"Kota", "Suhu (°C)", "Cuaca", "Kelembapan (%)", "Kecepatan Angin (m/s)"}, 0);
+        tblRiwayatCuaca.setModel(tableModel);
+    }
+    
+    private void loadFavorit() {
+        try (BufferedReader reader = new BufferedReader(new FileReader("favorit.csv"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                cbbFavorit.addItem(line.trim());
+            }
+        } catch (IOException e) {
+            // Abaikan jika file favorit.csv tidak ditemukan
+        }
+    }
+    
+    private void loadRiwayat() {
+        try (BufferedReader reader = new BufferedReader(new FileReader("riwayat.csv"))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                cbbRiwayat.addItem(line.trim());
+            }
+        } catch (IOException e) {
+            // Abaikan jika file riwayat.csv tidak ditemukan
+        }
+    }
+    
+    private WeatherData fetchWeatherData(String lokasi) throws Exception {
+        String apiKey = "108179319aba9408547cf0d3df4a540a";
+        String apiUrl = "https://api.openweathermap.org/data/2.5/weather?q=" + lokasi + "&units=metric&appid=" + apiKey;
+        HttpURLConnection connection = (HttpURLConnection) new URL(apiUrl).openConnection();
+        connection.setRequestMethod("GET");
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+        StringBuilder response = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            response.append(line);
+        }
+        reader.close();
+
+        JSONObject json = new JSONObject(response.toString());
+        double suhu = json.getJSONObject("main").getDouble("temp");
+        String deskripsi = json.getJSONArray("weather").getJSONObject(0).getString("description");
+        int kelembapan = json.getJSONObject("main").getInt("humidity");
+        double angin = json.getJSONObject("wind").getDouble("speed");
+        String iconCode = json.getJSONArray("weather").getJSONObject(0).getString("icon");
+        String iconUrl = "https://openweathermap.org/img/wn/" + iconCode + "@2x.png";
+
+        return new WeatherData(suhu, deskripsi, kelembapan, angin, iconUrl);
+    }
+
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -86,10 +145,6 @@ public class CariCuacaFrame extends javax.swing.JFrame {
                 btnSimpanFavoritActionPerformed(evt);
             }
         });
-
-        cbbRiwayat.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
-
-        cbbFavorit.setModel(new javax.swing.DefaultComboBoxModel<>(new String[] { "Item 1", "Item 2", "Item 3", "Item 4" }));
 
         jLabel7.setText("Riwayat");
 
@@ -182,13 +237,13 @@ public class CariCuacaFrame extends javax.swing.JFrame {
 
         tblRiwayatCuaca.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
-                {null, null, null, null},
-                {null, null, null, null},
-                {null, null, null, null},
-                {null, null, null, null}
+                {null, null, null, null, null},
+                {null, null, null, null, null},
+                {null, null, null, null, null},
+                {null, null, null, null, null}
             },
             new String [] {
-                "Title 1", "Title 2", "Title 3", "Title 4"
+                "Kota", "Suhu", "Cuaca", "Kelembapan", "Kecepatan angin"
             }
         ));
         jScrollPane1.setViewportView(tblRiwayatCuaca);
@@ -206,8 +261,8 @@ public class CariCuacaFrame extends javax.swing.JFrame {
             jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel4Layout.createSequentialGroup()
                 .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 500, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 42, Short.MAX_VALUE)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 524, Short.MAX_VALUE)
+                .addGap(18, 18, 18)
                 .addComponent(btnEksporRiwayat)
                 .addGap(29, 29, 29))
         );
@@ -220,6 +275,8 @@ public class CariCuacaFrame extends javax.swing.JFrame {
                     .addComponent(btnEksporRiwayat))
                 .addContainerGap(9, Short.MAX_VALUE))
         );
+
+        jScrollPane1.getAccessibleContext().setAccessibleDescription("");
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
@@ -265,89 +322,85 @@ public class CariCuacaFrame extends javax.swing.JFrame {
     }// </editor-fold>//GEN-END:initComponents
 
     private void btnCekCuacaActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCekCuacaActionPerformed
-    String apiKey = "108179319aba9408547cf0d3df4a540a"; // API Anda
-    String lokasi = txtLokasi.getText().trim();
-
-    if (lokasi.isEmpty()) {
-        JOptionPane.showMessageDialog(this, "Masukkan lokasi terlebih dahulu.");
-        return;
-    }
-
-    try {
-        String url = "https://api.openweathermap.org/data/2.5/weather?q=" + lokasi + "&units=metric&appid=" + apiKey;
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        connection.setRequestMethod("GET");
-
-        BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-        StringBuilder response = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) {
-            response.append(line);
+        String lokasi = txtLokasi.getText().trim();
+        if (lokasi.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Masukkan nama kota!");
+            return;
         }
-        reader.close();
 
-        // Parsing JSON Response
-        JSONObject json = new JSONObject(response.toString());
-        double suhu = json.getJSONObject("main").getDouble("temp");
-        String deskripsi = json.getJSONArray("weather").getJSONObject(0).getString("description");
-        int kelembapan = json.getJSONObject("main").getInt("humidity");
-        double angin = json.getJSONObject("wind").getDouble("speed");
-        String iconCode = json.getJSONArray("weather").getJSONObject(0).getString("icon");
+        try {
+            WeatherData weatherData = fetchWeatherData(lokasi);
 
-        // Tampilkan Hasil
-        lblSuhu.setText("Suhu: " + suhu + "°C");
-        lblDeskripsiCuaca.setText("Deskripsi Cuaca: " + deskripsi);
-        lblKelembapan.setText("Kelembapan: " + kelembapan + "%");
-        lblAngin.setText("Kecepatan Angin: " + angin + " m/s");
+            lblSuhu.setText("Suhu: " + weatherData.getTemperature() + "°C");
+            lblDeskripsiCuaca.setText("Deskripsi: " + weatherData.getDescription());
+            lblKelembapan.setText("Kelembapan: " + weatherData.getHumidity() + "%");
+            lblAngin.setText("Angin: " + weatherData.getWindSpeed() + " m/s");
+            lblIconCuaca.setIcon(new ImageIcon(new URL(weatherData.getIconImage())));
 
-        // Menampilkan Icon Cuaca
-        String iconUrl = "http://openweathermap.org/img/wn/" + iconCode + "@2x.png";
-        ImageIcon icon = new ImageIcon(new URL(iconUrl));
-        lblIconCuaca.setIcon(icon);
+            if (!isComboBoxContains(cbbRiwayat, lokasi)) {
+                cbbRiwayat.addItem(lokasi);
+                try (BufferedWriter writer = new BufferedWriter(new FileWriter("riwayat.csv", true))) {
+                    writer.write(lokasi + "\n");
+                }
+            }
 
-        // Tambahkan ke Riwayat
-        DefaultTableModel model = (DefaultTableModel) tblRiwayatCuaca.getModel();
-        model.addRow(new Object[]{lokasi, suhu, deskripsi, kelembapan, angin, LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"))});
-
-    } catch (Exception e) {
-        JOptionPane.showMessageDialog(this, "Gagal mendapatkan data cuaca: " + e.getMessage());
-    }
+            tableModel.addRow(new Object[]{lokasi, weatherData.getTemperature(), weatherData.getDescription(), weatherData.getHumidity(), weatherData.getWindSpeed()});
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Gagal mengambil data cuaca: " + ex.getMessage());
+        }
     }//GEN-LAST:event_btnCekCuacaActionPerformed
 
+
+    private boolean isComboBoxContains(JComboBox<String> comboBox, String item) {
+        for (int i = 0; i < comboBox.getItemCount(); i++) {
+            if (comboBox.getItemAt(i).equalsIgnoreCase(item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
     private void btnSimpanFavoritActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSimpanFavoritActionPerformed
-    String lokasi = txtLokasi.getText().trim();
-    if (lokasi.isEmpty()) {
-        JOptionPane.showMessageDialog(this, "Masukkan lokasi terlebih dahulu.");
-        return;
-    }
-    cbbFavorit.addItem(lokasi);
-    try (BufferedWriter writer = new BufferedWriter(new FileWriter("favorit.csv", true))) {
-        writer.write(lokasi + "\n");
-    } catch (IOException e) {
-        JOptionPane.showMessageDialog(this, "Gagal menyimpan ke favorit: " + e.getMessage());
-    }
+        String lokasi = txtLokasi.getText().trim();
+        if (lokasi.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Masukkan lokasi terlebih dahulu.");
+            return;
+        }
+
+        if (!isComboBoxContains(cbbFavorit, lokasi)) {
+            cbbFavorit.addItem(lokasi);
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter("favorit.csv", true))) {
+                writer.write(lokasi + "\n");
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Gagal menyimpan ke favorit: " + e.getMessage());
+            }
+        } else {
+            JOptionPane.showMessageDialog(this, "Lokasi sudah ada di favorit!");
+        }
     }//GEN-LAST:event_btnSimpanFavoritActionPerformed
 
     private void btnEksporRiwayatActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnEksporRiwayatActionPerformed
-    JFileChooser fileChooser = new JFileChooser();
-    int result = fileChooser.showSaveDialog(this);
+        JFileChooser fileChooser = new JFileChooser();
+        int result = fileChooser.showSaveDialog(this);
 
-    if (result == JFileChooser.APPROVE_OPTION) {
-        File file = fileChooser.getSelectedFile();
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            DefaultTableModel model = (DefaultTableModel) tblRiwayatCuaca.getModel();
-            for (int i = 0; i < model.getRowCount(); i++) {
-                for (int j = 0; j < model.getColumnCount(); j++) {
-                    writer.write(model.getValueAt(i, j).toString() + (j == model.getColumnCount() - 1 ? "" : ","));
-                }
-                writer.newLine();
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File file = fileChooser.getSelectedFile();
+            if (!file.getName().endsWith(".csv")) {
+                file = new File(file.getAbsolutePath() + ".csv");
             }
-            JOptionPane.showMessageDialog(this, "Data berhasil diekspor!");
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Gagal mengekspor data: " + e.getMessage());
-        }
-    }
 
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+                for (int i = 0; i < tableModel.getRowCount(); i++) {
+                    for (int j = 0; j < tableModel.getColumnCount(); j++) {
+                        writer.write(tableModel.getValueAt(i, j).toString() + (j == tableModel.getColumnCount() - 1 ? "" : ","));
+                    }
+                    writer.newLine();
+                }
+                JOptionPane.showMessageDialog(this, "Data berhasil diekspor!");
+            } catch (IOException e) {
+                JOptionPane.showMessageDialog(this, "Gagal mengekspor data: " + e.getMessage());
+            }
+        }
     }//GEN-LAST:event_btnEksporRiwayatActionPerformed
 
     /**
